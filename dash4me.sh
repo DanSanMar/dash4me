@@ -305,7 +305,6 @@ obtener_info_arranque() {
         sa_output=$(systemd-analyze 2>/dev/null | head -n 1)
 
         if [ -n "$sa_output" ]; then
-            # Corregido: "userspace" en lugar de "users"
             kernel_time=$(echo "$sa_output" | grep -oP '[\d\.]+(ms|s|min)(?=\s+\(kernel\))' || echo "N/A")
             user_time=$(echo "$sa_output" | grep -oP '[\d\.]+(ms|s|min)(?=\s+\(userspace\))' || echo "N/A")
             boot_time=$(echo "$sa_output" | awk -F '=' '{print $2}' | xargs || echo "N/A")
@@ -337,7 +336,7 @@ obtener_info_arranque() {
         fi
     fi
 
-    # 4. Cálculo de la media histórica (Sin usar eval)
+    # 4. Cálculo de la media histórica (Corrección del error sintáctico)
     local media_str="N/A"
     local comparativa=""
 
@@ -359,13 +358,14 @@ obtener_info_arranque() {
             read -r media diff count <<< "$stats"
             media_str="${media}s ($count log)"
 
-            local es_mayor=$(awk "BEGIN {print ($diff > 0.5)?1:0}")
-            local es_menor=$(awk "BEGIN {print ($diff < -0.5)?1:0}")
+            local es_mayor=$(awk -v d="$diff" 'BEGIN {print (d > 0.5)?1:0}')
+            local es_menor=$(awk -v d="$diff" 'BEGIN {print (d < -0.5)?1:0}')
 
             if [ "$es_mayor" -eq 1 ]; then
                 comparativa=" ${ROJO_BRILLANTE}(+${diff}s)${RESET}"
             elif [ "$es_menor" -eq 1 ]; then
-                local diff_abs=$(awk "BEGIN {printf \"%.2f\", ($diff < 0 ? -$diff : $diff)}")
+                # Cálculo seguro del valor absoluto usando la función abs() en awk
+                local diff_abs=$(awk -v d="$diff" 'BEGIN { printf "%.2f", (d < 0 ? -d : d) }')
                 comparativa=" ${VERDE_BRILLANTE}(-${diff_abs}s)${RESET}"
             else
                 comparativa=" ${VERDE_BRILLANTE}(=)${RESET}"
